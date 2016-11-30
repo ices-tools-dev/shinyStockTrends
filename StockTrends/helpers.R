@@ -2,26 +2,28 @@
 
 queryICES <- function() {
   library(dplyr)
-  library(ggplot2)
   library(icesSAG)
   library(tidyr)
-  library(shiny)
-  
-  options(scipen = 5)
+
+  # options(scipen = 5)
   
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
   # DATA SOURCE: FAO codes and ICES stock codes #
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
   # (NOTE: current ICES stock codes do not necessarily match with FAO 3-character
   # codes, in the future this look-up table should not be necessary - SL)
-  speciesID <- read.csv("ICESspeciesID_v1.csv",
+  # speciesID <- read.csv("~/git/ices-dk/shinyStockTrends/StockTrends/data/ICESspeciesID_v1.csv",
+  #                       stringsAsFactors = FALSE)
+  speciesID <- read.csv("data/ICESspeciesID_v1.csv",
                         stringsAsFactors = FALSE)
   
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
   # DATA SOURCE: Fishery guilds by ICES stock code #
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
   # (NOTE: These guilds should become a part of the RECO database - SL)
-  fisheryGuild <- read.csv("fisheryGuild.csv",
+  # fisheryGuild <- read.csv("~/git/ices-dk/shinyStockTrends/StockTrends/data/fisheryGuild.csv",
+  #                          stringsAsFactors = FALSE)
+  fisheryGuild <- read.csv("data/fisheryGuild.csv",
                            stringsAsFactors = FALSE)
   
   speciesGuild <- fisheryGuild %>%
@@ -116,7 +118,8 @@ queryICES <- function() {
   
   # Get stock list
   # url <- "http://admin.ices.dk/StockListServices/odata/StockListDWsOData?$filter=ActiveYear%20eq%202016"
-  url <- "StockListDWsOData.json"
+  # url <- "~/git/ices-dk/shinyStockTrends/StockTrends/data/StockListDWsOData.json"
+  url <- "data/StockListDWsOData.json"
   rawsl <- jsonlite::fromJSON(url, simplifyDataFrame = TRUE)$value
   
   # Combine Norwegian and Barents Sea Ecoregions
