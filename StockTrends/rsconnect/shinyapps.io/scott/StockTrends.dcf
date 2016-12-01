@@ -3,8 +3,8 @@ title: StockTrends
 account: scott
 server: shinyapps.io
 appId: 141082
-bundleId: 630277
+bundleId: 631886
 url: https://scott.shinyapps.io/StockTrends/
-when: 1480513008.91817
+when: 1480604278.35025
 asMultiple: FALSE
 asStatic: FALSE

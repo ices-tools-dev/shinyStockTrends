@@ -10,11 +10,11 @@ ui <- fluidPage(
   titlePanel("Trends in stock status"),
   sidebarLayout(
     sidebarPanel(
-
+      
       h5("1. Click the icon to query data from ICES databases"),
       actionButton(inputId = "queryICES",
                    label = img(src = "http://www.ices.dk/SiteCollectionImages/ICES%20logos/ICES%20logo%20acronym%20PNG%20format.png",
-                       width = "100px")
+                               width = "100px")
       ),
       h6("Be patient, this might take a minute..."),
       h6(textOutput(outputId = "nrows")),
@@ -39,7 +39,7 @@ ui <- fluidPage(
         label = "",
         choices = ""
       ),
-
+      
       h5("4. Choose stock(s)"),
       actionButton(inputId = "selectStock",
                    label = "Select all stocks"
@@ -72,47 +72,41 @@ server = function(input, output, session){
   # When the "query ICES databases" button is pushed, run the queryICES() function
   stockTrends <- eventReactive(input$queryICES, {
     queryICES()
-  })
+    # readRDS("~/git/ices-dk/shinyStockTrends/tester.rds")
+    })
   
   # When the ICES databases are called, update ecoregions based on available data
   outVarEco = reactive({
-    if(input$queryICES == 0) {
-      return(NULL)
-    }
+    req(input$queryICES)
     sort(unique(stockTrends()$ECOREGION))
   })
   
   observeEvent(input$queryICES, {
     updateCheckboxGroupInput(session, "ecoregion", choices = outVarEco())
   })
-  
+
   # When select all button is toggled, select all available ecoregions
   observe({
-    if(input$queryICES == 0) {
-      return(NULL)
-    } else {
-      if(input$selectEco > 0) {
-        if(input$selectEco %% 2 == 0){
-          updateCheckboxGroupInput(session = session,
-                                   inputId = "ecoregion",
-                                   choices = outVarEco(),
-                                   selected = c())
-          
-        } else {
-          updateCheckboxGroupInput(session = session,
-                                   inputId = "ecoregion",
-                                   choices = outVarEco(),
-                                   selected = c(outVarEco()))
-        }
+    req(input$queryICES)
+    if(input$selectEco > 0) {
+      if(input$selectEco %% 2 == 0){
+        updateCheckboxGroupInput(session = session,
+                                 inputId = "ecoregion",
+                                 choices = outVarEco(),
+                                 selected = c())
+        
+      } else {
+        updateCheckboxGroupInput(session = session,
+                                 inputId = "ecoregion",
+                                 choices = outVarEco(),
+                                 selected = c(outVarEco()))
       }
     }
   })
   
   # When ecoregions are selected display the available guilds
   outVarGuild = reactive({
-    if(input$queryICES == 0) {
-      return(NULL)
-    }
+    req(input$queryICES)
     sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion)]))
   })
   observeEvent(input$ecoregion, {
@@ -120,9 +114,7 @@ server = function(input, output, session){
   })
   # When select all button is toggled, select all available guilds
   observe({
-    if(input$queryICES == 0) {
-      return(NULL)
-    } else {
+    req(input$queryICES)
       if(input$selectGuild > 0) {
         if(input$selectGuild %% 2 == 0){
           updateCheckboxGroupInput(session = session,
@@ -136,42 +128,35 @@ server = function(input, output, session){
                                    choices = outVarGuild(),
                                    selected = c(outVarGuild()))
         }
-      }
     }
   })
   
   # When ecoregion and guilds are selected display the available stocks
   outVarStock = reactive({
-    if(input$queryICES == 0) {
-      return(NULL)
-    }
-    if(input$guild %in% c("")) {
-      return(NULL)
-    }
+    req(input$queryICES, input$ecoregion, input$guild)
+
     sort(unique(stockTrends()$STOCK.CODE[which(stockTrends()$ECOREGION %in% input$ecoregion &
                                                stockTrends()$FISHERIES.GUILD %in% input$guild)]))
   })
   observeEvent(input$guild, {
     updateCheckboxGroupInput(session, "stock.code", choices = outVarStock())
   })
+  
   # When select all button is toggled, select all available stocks
   observe({
-    if(input$queryICES == 0) {
-      return(NULL)
-    } else {
-      if(input$selectStock > 0) {
-        if(input$selectStock %% 2 == 0){
-          updateCheckboxGroupInput(session = session,
-                                   inputId = "stock.code",
-                                   choices = outVarStock(),
-                                   selected = c())
-          
-        } else {
-          updateCheckboxGroupInput(session = session,
-                                   inputId = "stock.code",
-                                   choices = outVarStock(),
-                                   selected = c(outVarStock()))
-        }
+    req(input$queryICES)
+    if(input$selectStock > 0) {
+      if(input$selectStock %% 2 == 0){
+        updateCheckboxGroupInput(session = session,
+                                 inputId = "stock.code",
+                                 choices = outVarStock(),
+                                 selected = c())
+        
+      } else {
+        updateCheckboxGroupInput(session = session,
+                                 inputId = "stock.code",
+                                 choices = outVarStock(),
+                                 selected = c(outVarStock()))
       }
     }
   })
@@ -187,100 +172,98 @@ server = function(input, output, session){
   
   # Print the line plot of stock trends
   output$linePlot <- renderPlot({
-    if(is.null(input$queryICES) ||
-       is.null(input$ecoregion) ||
-       is.null(input$guild) ||
-       is.null(input$stock.code)) {
-      return(NULL)
-    } else {
-      
-      dat <- stockTrends() %>%
-        filter(ECOREGION %in% input$ecoregion,
-               FISHERIES.GUILD %in% input$guild,
-               STOCK.CODE %in% input$stock.code,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
-      
-      if(all(is.na(dat$stockValue))) {
-        return(NULL)
-      } else {
-        stockSummaryTrends(dat = dat, overallMean = TRUE, legend.cex = 1)
-      }
-    }
-  }
-  )
+    validate(
+      need(input$queryICES, "Please click the ICES logo to download data"),
+      need(input$ecoregion, "Please select ecoregion"),
+      need(input$guild, "Please select guild"),
+      need(input$stock.code, "Please select stock")
+    )
+    
+    dat <- stockTrends() %>%
+      filter(ECOREGION %in% input$ecoregion,
+             FISHERIES.GUILD %in% input$guild,
+             STOCK.CODE %in% input$stock.code,
+             METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+    
+    validate(
+      need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+    )
+    stockSummaryTrends(dat = dat, overallMean = TRUE, legend.cex = 1)
+  })
   
   # Print user-defined file name
   output$value <- renderPrint({ input$text })
   
   # Print the data table
   output$dataTable <- renderDataTable({
-    if(is.null(input$queryICES) ||
-       is.null(input$ecoregion) ||
-       is.null(input$guild) ||
-       is.null(input$stock.code)) {
-      return(NULL)
-    } else {
-      
-      dat <- stockTrends() %>%
-        filter(ECOREGION %in% input$ecoregion,
-               FISHERIES.GUILD %in% input$guild,
-               STOCK.CODE %in% input$stock.code,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
-      
-      if(all(is.na(dat$stockValue))) {
-        return(NULL)
-      } else {
-        dat
-      }
-    }
-  }
-  )
+    validate(
+      need(input$queryICES, "Please click the ICES logo to download data"),
+      need(input$ecoregion, "Please select ecoregion"),
+      need(input$guild, "Please select guild"),
+      need(input$stock.code, "Please select stock")
+    )
+    
+    dat <- stockTrends() %>%
+      filter(ECOREGION %in% input$ecoregion,
+             FISHERIES.GUILD %in% input$guild,
+             STOCK.CODE %in% input$stock.code,
+             METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+    
+    validate(
+      need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+    )
+    dat
+  })
   
   # The download data button
   output$downloadData <- downloadHandler(
     filename = function() {paste0(input$text, ".csv")},
     content = function(file) {
+      validate(
+        need(input$queryICES, "Please click the ICES logo to download data"),
+        need(input$ecoregion, "Please select ecoregion"),
+        need(input$guild, "Please select guild"),
+        need(input$stock.code, "Please select stock")
+      )
       
       dat <- stockTrends() %>%
         filter(ECOREGION %in% input$ecoregion,
                FISHERIES.GUILD %in% input$guild,
                STOCK.CODE %in% input$stock.code,
                METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
-      
-      if(all(is.na(dat$stockValue))) {
-        return(NULL)
-      } else {
-        write.csv(x = dat, file = file, row.names = FALSE)
-      }
-    }
-  )
+      validate(
+        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+      )
+      write.csv(x = dat, file = file, row.names = FALSE)
+    })
   
   # The download plot button
   output$downloadPlot <- downloadHandler(
     filename = function() {paste0(input$text, ".png")},
     content = function(file) {
-      
+      validate(
+        need(input$queryICES, "Please click the ICES logo to download data"),
+        need(input$ecoregion, "Please select ecoregion"),
+        need(input$guild, "Please select guild"),
+        need(input$stock.code, "Please select stock")
+      )
       png(file,
           width = 89,
           height = 50.25 * 2,
           units = "mm",
           res = 300)
-      
       dat <- stockTrends() %>%
         filter(ECOREGION %in% input$ecoregion,
                FISHERIES.GUILD %in% input$guild,
                STOCK.CODE %in% input$stock.code,
                METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
-      
-      if(all(is.na(dat$stockValue))) {
-        return(NULL)
-      } else {
-        stockSummaryTrends(dat = dat, overallMean = TRUE, legend.cex = 0.5)
-        dev.off()
-      }
+      validate(
+        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+      )
+      stockSummaryTrends(dat = dat, overallMean = TRUE, legend.cex = 0.5)
+      dev.off()
     }
-  )
-} 
+  )} 
 
 # Run the application 
 shinyApp(ui = ui, server = server)
