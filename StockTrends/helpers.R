@@ -88,8 +88,6 @@ queryICES <- function() {
            Flim = FLim,
            STOCK.CODE = FishStockName) %>%
     mutate(STOCK.CODE = tolower(STOCK.CODE))
-  # %>%
-  #   gather(REFERENCE.POINT, value = VALUE, -STOCK.CODE)
   
   fullSummary <- summaryTblClean %>%
     left_join(refPtsClean, by = c("STOCK.CODE" = "STOCK.CODE")) %>%
@@ -123,8 +121,8 @@ queryICES <- function() {
   rawsl <- jsonlite::fromJSON(url, simplifyDataFrame = TRUE)$value
   
   # Combine Norwegian and Barents Sea Ecoregions
-  rawsl$NorwegianSeaandBarentsSeaEcoregion[!is.na(rawsl$NorwegianSeaEcoregion) |
-                                             !is.na(rawsl$BarentsSeaEcoregion)] <- "x"
+  # rawsl$NorwegianSeaandBarentsSeaEcoregion[!is.na(rawsl$NorwegianSeaEcoregion) |
+  #                                            !is.na(rawsl$BarentsSeaEcoregion)] <- "x"
   # Reorganize from a wide data frame to a long data frame with species guild information
   ecoregions <- colnames(rawsl)[grepl("^.+(Ecoregion)$", colnames(rawsl))]
   
@@ -134,8 +132,10 @@ queryICES <- function() {
   sl <- rawsl %>%
     select_(.dots = dots) %>%
     gather(ECOREGION, value, -StockCode, -Description, -DataCategory, -AdviceType) %>%
-    filter(!is.na(value),
-           !ECOREGION %in% c("NorwegianSeaEcoregion", "BarentsSeaEcoregion")) %>%
+    filter(!is.na(value)
+           # ,
+           # !ECOREGION %in% c("NorwegianSeaEcoregion", "BarentsSeaEcoregion")
+           ) %>%
     select(STOCK.CODE = StockCode,
            STOCK.NAME = Description,
            CAT = DataCategory,
@@ -149,6 +149,7 @@ queryICES <- function() {
            ECOREGION = as.character(ECOREGION),
            ECOREGION = recode(ECOREGION, "AzoresEcoregion" = "Azores"),
            ECOREGION = recode(ECOREGION, "BayofBiscayandtheIberianCoastEcoregion" = "Bay of Biscay and the Iberian Coast"),
+           ECOREGION = recode(ECOREGION, "BarentsSeaEcoregion" = "Barents Sea"), 
            ECOREGION = recode(ECOREGION, "BalticSeaEcoregion" = "Baltic Sea"),
            ECOREGION = recode(ECOREGION, "CelticSeasEcoregion" = "Celtic Seas"),
            ECOREGION = recode(ECOREGION, "FaroesEcoregion" = "Faroes"),
@@ -156,7 +157,9 @@ queryICES <- function() {
            ECOREGION = recode(ECOREGION, "IcelandSeaEcoregion" = "Iceland Sea"),
            ECOREGION = recode(ECOREGION, "GreaterNorthSeaEcoregion" = "Greater North Sea"),
            ECOREGION = recode(ECOREGION, "OceanicNortheastAtlanticEcoregion" = "Oceanic north-east Atlantic"),
-           ECOREGION = recode(ECOREGION, "NorwegianSeaandBarentsSeaEcoregion" = "Norwegian Sea and Barents Sea")) %>%
+           ECOREGION = recode(ECOREGION, "NorwegianSeaEcoregion" = "Norwegian Sea")
+           # ECOREGION = recode(ECOREGION, "NorwegianSeaandBarentsSeaEcoregion" = "Norwegian Sea and Barents Sea")
+           ) %>%
     left_join(speciesGuild, c("STOCK.CODE" = "STOCK.CODE"))
   
   
