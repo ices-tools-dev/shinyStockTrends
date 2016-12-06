@@ -199,9 +199,8 @@ queryICES <- function() {
   return(stockTrends)
 }
 
-
-
 stockSummaryTrends <- function(dat, 
+                               LINEGROUP = c(STOCK.CODE, FISHERIES.GUILD),
                                overallMean = NULL,
                                legend.cex = 0.5) {
   
@@ -209,16 +208,20 @@ stockSummaryTrends <- function(dat,
                "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999")
   ltyList <- c(1,3:6)
   
-  
+  # LINEGROUP = "STOCK.CODE"
+  dots <- lapply(c("lineGroup" = LINEGROUP, "Year", "plotGroup" = "METRIC", "plotValue" = "stockValue"),
+                 as.symbol)
   
   allDat <- dat %>%
     # mutate(ECOGUILD = paste0(ECOREGION, ", ", FISHERIES.GUILD)) %>%
     # ungroup() %>%
-    select(#pageGroup = ECOGUILD,
-      lineGroup = STOCK.CODE,
-      Year,
-      plotGroup = METRIC,
-      plotValue = stockValue) %>%
+    select_(.dots = dots) %>%
+    # select_(
+    #   #pageGroup = ECOGUILD,
+    #   lineGroup = STOCK.CODE,
+    #   Year,
+    #   plotGroup = METRIC,
+    #   plotValue = stockValue) %>%
     filter(!is.na(plotValue))
   #
   oMean <- dat %>%
@@ -234,7 +237,8 @@ stockSummaryTrends <- function(dat,
     mutate(lineGroup = "MEAN") %>%
     filter(!is.na(plotValue))
   
-  allDat <- bind_rows(allDat, oMean)
+  allDat <- bind_rows(allDat, oMean) %>%
+    ungroup()
   
   # Set up colors
   plotList <- allDat %>%
