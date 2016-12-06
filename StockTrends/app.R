@@ -129,10 +129,8 @@ server = function(input, output, session){
   
   # When the "query ICES databases" button is pushed, run the queryICES() function
   stockTrends <- eventReactive(input$queryICES, {
-    # queryICES()
-  
-      # stockTrends <- 
-    readRDS("data/tester.rds")
+    queryICES()
+    # readRDS("data/tester.rds")
     })
   
     # dat <- reactive({
