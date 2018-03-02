@@ -375,7 +375,11 @@ server = function(input, output, session){
                GUILD %in% input$guild_gldEco,
                plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
         rename(pageGroup = ECOREGION,
-               lineGroup = GUILD)
+               lineGroup = GUILD) %>% 
+        # select(-plotValue) %>%
+        group_by(Year, lineGroup, plotGroup) %>%
+        summarize(plotValue = mean(plotValue, na.rm = TRUE))
+      
       
       validate(
         need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
@@ -440,7 +444,11 @@ server = function(input, output, session){
       dat <- stockTrends()%>%
         filter(ECOREGION %in% input$ecoregion_gldEco,
                GUILD %in% input$guild_gldEco,
-               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
+               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
+        # select(-plotValue) %>%
+        group_by(Year, lineGroup, plotGroup) %>%
+        summarize(plotValue = mean(plotValue, na.rm = TRUE))
+      
       
       validate(
         need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
@@ -488,7 +496,12 @@ server = function(input, output, session){
         dat <- stockTrends()%>%
           filter(ECOREGION %in% input$ecoregion_gldEco,
                  GUILD %in% input$guild_gldEco,
-                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
+          rename(pageGroup = ECOREGION,
+                 lineGroup = GUILD) %>% 
+          # select(-plotValue) %>%
+          group_by(Year, lineGroup, plotGroup) %>%
+          summarize(plotValue = mean(plotValue, na.rm = TRUE))
         
         validate(
           need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
@@ -555,15 +568,15 @@ server = function(input, output, session){
           need(input$guild_gldEco, "Please select guild")
         )
         
-        dat <- stockTrends()%>%
+        dat <- stockTrends() %>%
           filter(ECOREGION %in% input$ecoregion_gldEco,
                  GUILD %in% input$guild_gldEco,
-                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
           rename(pageGroup = ECOREGION,
-                 lineGroup = GUILD)
-          # select(-STOCK.CODE) %>%
-          # group_by(Year, FISHERIES.GUILD, METRIC) %>%
-          # summarize(stockValue = mean(stockValue, na.rm = TRUE))
+                 lineGroup = GUILD) %>% 
+          # select(-plotValue) %>%
+          group_by(Year, lineGroup, plotGroup) %>%
+          summarize(plotValue = mean(plotValue, na.rm = TRUE))
         
         validate(
           need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
