@@ -1,9 +1,8 @@
-rm(list = ls())
 library(dplyr)
 library(shiny)
 
-
-# source("~/git/ices-dk/shinyStockTrends/StockTrends/helpers.R")
+devtools::install_github("ices-tools-prod/fisheryO")
+library(fisheryO)
 source("helpers.R")
 
 ui <- fluidPage(
@@ -11,22 +10,13 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       
-      h5("1. Click the ICES logo to query data from ICES databases"),
-      actionButton(inputId = "queryICES",
-                   label = img(src = "ICES_LOGO.png",
-                               width = "100px")
-      ),
-      h6("Be patient, this might take a minute..."),
-      h6(textOutput(outputId = "nrows")),
-      tags$hr(),
-      
       h5( "Select the data you want to explore:"),
       radioButtons(inputId = "dataType", 
                    label = "",
                    list("Fish stocks by guild and ecoregion" = "stoGldEco",
                         "Fisheries guilds by ecoregion" = "gldEco"),
                         # "Fish stocks by name" = "stockName"),
-                   selected = "stoGldEco"),
+                   selected = ""),
       
       # Fish stocks by guild and ecoregion
       conditionalPanel(
@@ -54,7 +44,7 @@ ui <- fluidPage(
                      label = "Select all stocks"
         ),
         checkboxGroupInput(
-          inputId = "stock.code_stoGldEco",
+          inputId = "stock_stoGldEco",
           label = "",
           choices = ""
         )
@@ -118,71 +108,117 @@ ui <- fluidPage(
   )
 )
 
-
+###~~~~~~~~~###
+#### Server ####
+###~~~~~~~~~###
 
 server = function(input, output, session){
   
+  stockTrends <- eventReactive(input$dataType, {
+    
+    if(req(input$dataType) == "stoGldEco") {
+      stoGldEco_dat <- fisheryO:::clean_stock_trends(active_year = 2017,
+                                                     grouping_var = "EcoGuild",
+                                                     plotting_var = "StockCode",
+                                                     metric = "MSY")$stock_trends_frmt %>% 
+        ungroup %>% 
+        mutate(pageGroup = gsub(" stocks", "", pageGroup))
+      
+      stoGldEco_dat <- tidyr::separate(stoGldEco_dat, col = pageGroup,
+                      into = c("ECOREGION", "GUILD"),
+                      sep = " - ")
+      return(stoGldEco_dat)
+    }
+    
+    if(req(input$dataType) == "gldEco") {
+      
+      gldEco_dat <- fisheryO:::clean_stock_trends(active_year = 2017,
+                                                  grouping_var = "EcoRegion",
+                                                  plotting_var = "FisheriesGuild",
+                                                  metric = "MSY")$stock_trends_frmt
+      
+      gldEco_dat %>% 
+        dplyr::rename(ECOREGION = pageGroup,
+                      GUILD = lineGroup)
+      }
 
+  })
+   
   ######################
   ### Input handling ###
   ######################
   
-  # When the "query ICES databases" button is pushed, run the queryICES() function
-  stockTrends <- eventReactive(input$queryICES, {
-    queryICES()
-    # readRDS("data/tester.rds")
-    })
-  
-    # dat <- reactive({
-  #   req(input$queryICES)
-  # 
-  #   dat <- switch(input$dataType,
-  #                 "Fish stocks by guild and ecoregion" = "stoGldEco",
-  #                 "Fisheries guilds by ecoregion" = "gldEco",
-  #                 "Fish stocks by name" = "stockName")
-  #   # rawData %>%
-  # 
-  # })
-  
-  
   # When the ICES databases are called, update ecoregions based on available data
   observe({
-    req(input$queryICES,
-        input$dataType)
+    req(input$dataType)
     
     if(req(input$dataType) == "stoGldEco") {
+
+      # stockTrends <- fisheryO:::clean_stock_trends(active_year = 2017,
+      #                                      grouping_var = "EcoGuild",
+      #                                      plotting_var = "StockCode",
+      #                                      metric = "MSY")$stock_trends_frmt %>% 
+      #   ungroup %>% 
+      #   mutate(pageGroup = gsub(" stocks", "", pageGroup))
+      # 
+      # stockTrends <- tidyr::separate(stockTrends, col = pageGroup,
+      #                                      into = c("ECOREGION", "GUILD"),
+      #                                      sep = " - ")
+      stock_data <- stockTrends()
+      
+      choices <- sort(unique(stock_data$ECOREGION))
+      
       updateCheckboxGroupInput(session, 
                                "ecoregion_stoGldEco",
-                               choices = sort(unique(stockTrends()$ECOREGION)))
+                               choices = choices)
+      
       if(req(input$selectEco_stoGldEco)) {
+        
         if(req(input$selectEco_stoGldEco) %% 2 == 0) {
+      
           updateCheckboxGroupInput(session = session,
                                    inputId = "ecoregion_stoGldEco",
-                                   choices = sort(unique(stockTrends()$ECOREGION)),
+                                   choices = choices,
                                    selected = c())
         } else {
           updateCheckboxGroupInput(session = session,
                                    inputId = "ecoregion_stoGldEco",
-                                   choices = sort(unique(stockTrends()$ECOREGION)),
-                                   selected = c(sort(unique(stockTrends()$ECOREGION))))
+                                   choices = choices,
+                                   selected = c(choices))
         }
       }
     }
+    
     if(req(input$dataType) == "gldEco") {
+      
+      # stockTrends <- fisheryO:::clean_stock_trends(active_year = 2017,
+      #                                      grouping_var = "EcoRegion",
+      #                                      plotting_var = "FisheriesGuild",
+      #                                      metric = "MSY")$stock_trends_frmt
+      # 
+      # stockTrends <- stockTrends %>% 
+      #   dplyr::rename(ECOREGION = pageGroup,
+      #          GUILD = lineGroup)
+      # 
+      stock_data <- stockTrends()
+      
+      choices <- sort(unique(stock_data$ECOREGION))
+      
       updateCheckboxGroupInput(session, 
                                "ecoregion_gldEco",
-                               choices = sort(unique(stockTrends()$ECOREGION)))
+                               choices = choices)
+      
       if(req(input$selectEco_gldEco)) {
         if(req(input$selectEco_gldEco) %% 2 == 0) {
           updateCheckboxGroupInput(session = session,
                                    inputId = "ecoregion_gldEco",
-                                   choices = sort(unique(stockTrends()$ECOREGION)),
+                                   choices = choices,
                                    selected = c())
         } else {
           updateCheckboxGroupInput(session = session,
                                    inputId = "ecoregion_gldEco",
-                                   choices = sort(unique(stockTrends()$ECOREGION)),
-                                   selected = c(sort(unique(stockTrends()$ECOREGION))))
+                                   choices = choices,
+                                   selected = c(choices))
         }
       }
     }
@@ -190,26 +226,30 @@ server = function(input, output, session){
   
   # When ecoregions are selected display the available guilds
   observe({
-    req(input$queryICES,
-        input$dataType)
+    req(input$dataType)
     
     if(req(input$dataType) == "stoGldEco") {
       req(input$ecoregion_stoGldEco)
       
+      stock_data <- stockTrends()
+      
+      choices_stoGldEco <- sort(unique(stock_data$GUILD[which(stock_data$ECOREGION
+                                                                     %in% input$ecoregion_stoGldEco)]))
+      
       updateCheckboxGroupInput(session, 
                                "guild_stoGldEco",
-                               choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco)])))
+                               choices = choices_stoGldEco)
       if(req(input$selectGuild_stoGldEco)) {
         if(req(input$selectGuild_stoGldEco) %% 2 == 0) {
           updateCheckboxGroupInput(session = session,
                                    inputId = "guild_stoGldEco",
-                                   choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco)])),
+                                   choices = choices_stoGldEco,
                                    selected = c())
         } else {
           updateCheckboxGroupInput(session = session,
                                    inputId = "guild_stoGldEco",
-                                   choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco)])),
-                                   selected = c(sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco)]))))
+                                   choices = choices_stoGldEco,
+                                   selected = c(choices_stoGldEco))
         }
       }
     }
@@ -217,20 +257,25 @@ server = function(input, output, session){
     if(req(input$dataType) == "gldEco") {
       req(input$ecoregion_gldEco)
       
+      stock_data <- stockTrends()
+      
+      choices_gldEco <- sort(unique(stock_data$GUILD[which(stock_data$ECOREGION %in% 
+                                                                          input$ecoregion_gldEco)]))
+      
       updateCheckboxGroupInput(session, 
                                "guild_gldEco",
-                               choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_gldEco)])))
+                               choices = choices_gldEco)
       if(req(input$selectGuild_gldEco)) {
         if(req(input$selectGuild_gldEco) %% 2 == 0) {
           updateCheckboxGroupInput(session = session,
                                    inputId = "guild_gldEco",
-                                   choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_gldEco)])),
+                                   choices = choices_gldEco,
                                    selected = c())
         } else {
           updateCheckboxGroupInput(session = session,
                                    inputId = "guild_gldEco",
-                                   choices = sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_gldEco)])),
-                                   selected = c(sort(unique(stockTrends()$FISHERIES.GUILD[which(stockTrends()$ECOREGION %in% input$ecoregion_gldEco)]))))
+                                   choices = choices_gldEco,
+                                   selected = c(choices_gldEco))
         }
       }
     }
@@ -238,52 +283,43 @@ server = function(input, output, session){
   
   # When ecoregion and guilds are selected display the available stocks
   observe({
-    req(input$queryICES,
-        input$dataType,
+    req(input$dataType,
         input$ecoregion_stoGldEco,
         input$guild_stoGldEco)
     
     if(req(input$dataType) == "stoGldEco") {
+      
+      stock_data <- stockTrends()
+      
+      stocks_stoGldEco <- sort(unique(stock_data$lineGroup[which(stock_data$ECOREGION %in% input$ecoregion_stoGldEco &
+                                                                       stock_data$GUILD %in% input$guild_stoGldEco)]))
       updateCheckboxGroupInput(session, 
-                               "stock.code_stoGldEco",
-                               choices = sort(unique(stockTrends()$STOCK.CODE[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco &
-                                                                                    stockTrends()$FISHERIES.GUILD %in% input$guild_stoGldEco)])))
+                               "stock_stoGldEco",
+                               choices = stocks_stoGldEco)
       if(req(input$selectStock_stoGldEco)) {
         if(req(input$selectStock_stoGldEco) %% 2 == 0) {
           updateCheckboxGroupInput(session = session,
-                                   inputId = "stock.code_stoGldEco",
-                                   choices = sort(unique(stockTrends()$STOCK.CODE[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco &
-                                                                                        stockTrends()$FISHERIES.GUILD %in% input$guild_stoGldEco)])),
+                                   inputId = "stock_stoGldEco",
+                                   choices = stocks_stoGldEco,
                                    selected = c())
         } else {
           updateCheckboxGroupInput(session = session,
-                                   inputId = "stock.code_stoGldEco",
-                                   choices = sort(unique(stockTrends()$STOCK.CODE[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco &
-                                                                                        stockTrends()$FISHERIES.GUILD %in% input$guild_stoGldEco)])),
-                                   selected = c(sort(unique(stockTrends()$STOCK.CODE[which(stockTrends()$ECOREGION %in% input$ecoregion_stoGldEco &
-                                                                                           stockTrends()$FISHERIES.GUILD %in% input$guild_stoGldEco)]))))
+                                   inputId = "stock_stoGldEco",
+                                   choices = stocks_stoGldEco,
+                                   selected = c(stocks_stoGldEco))
         }
       }
     } 
   })
   
-  
-  
   # 
   ###############
   ### OUTPUTS ###
   ###############
-  
-  # Print the number of rows downloaded
-  output$nrows <- renderText({
-    paste0("Success! ", scales::comma(nrow(stockTrends())), " rows of data are loaded.")
-  })
-  
+
   # Print the line plot of stock trends
   output$linePlot <- renderPlot({
-    validate(
-      need(input$queryICES, "Please click the ICES logo to download data"),
-      need(input$dataType, "Please select how you want the data")
+    validate(need(input$dataType, "Please select how you want the data")
     )
     
     if(req(input$dataType) == "stoGldEco") {
@@ -291,20 +327,40 @@ server = function(input, output, session){
       validate(    
         need(input$ecoregion_stoGldEco, "Please select ecoregion"),
         need(input$guild_stoGldEco, "Please select guild"),
-        need(input$stock.code_stoGldEco, "Please select stock")
+        need(input$stock_stoGldEco, "Please select stock")
       )
       
       dat <- stockTrends() %>%
         filter(ECOREGION %in% input$ecoregion_stoGldEco,
-               FISHERIES.GUILD %in% input$guild_stoGldEco,
-               STOCK.CODE %in% input$stock.code_stoGldEco,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+               GUILD %in% input$guild_stoGldEco,
+               lineGroup %in% input$stock_stoGldEco,
+               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
+        mutate(pageGroup = sprintf("%s - %s stocks",
+                                   ECOREGION,
+                                   GUILD)) %>% 
+        select(-ECOREGION,
+               -GUILD)
       
       validate(
-        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+        need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
       )
       
-      stockSummaryTrends(dat = dat, LINEGROUP = "STOCK.CODE", overallMean = TRUE, legend.cex = 1)
+      object <- unique(dat$pageGroup)
+      
+      return(stock_trends_fun(object = object,
+                       dat = dat,
+                       plotting_var = "StockCode",
+                       grouping_var = "EcoGuild",
+                       metric = "MSY",
+                       active_year = 2017,
+                       dynamic = FALSE,
+                       data_caption = TRUE,
+                       file_name = NULL,
+                       save_plot = FALSE,
+                       return_plot = TRUE,
+                       return_data = FALSE,
+                       output_path = NULL,
+                       stackable = FALSE))
     }
     
     if(req(input$dataType) == "gldEco") {
@@ -314,19 +370,33 @@ server = function(input, output, session){
         need(input$guild_gldEco, "Please select guild")
       )
       
-      dat <- stockTrends() %>%
+      dat <- stockTrends()%>%
         filter(ECOREGION %in% input$ecoregion_gldEco,
-               FISHERIES.GUILD %in% input$guild_gldEco,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
-        select(-STOCK.CODE) %>%
-        group_by(Year, FISHERIES.GUILD, METRIC) %>%
-        summarize(stockValue = mean(stockValue, na.rm = TRUE))
+               GUILD %in% input$guild_gldEco,
+               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
+        rename(pageGroup = ECOREGION,
+               lineGroup = GUILD)
       
       validate(
-        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+        need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
       )
       
-      stockSummaryTrends(dat = dat, LINEGROUP = "FISHERIES.GUILD", overallMean = TRUE, legend.cex = 1)
+      object <- unique(dat$pageGroup)
+      
+      return(stock_trends_fun(object = object,
+                       dat = dat,
+                       plotting_var = "FisheriesGuild",
+                       grouping_var = "EcoRegion",
+                       metric = "MSY",
+                       active_year = 2017,
+                       dynamic = FALSE,
+                       data_caption = TRUE,
+                       file_name = NULL,
+                       save_plot = FALSE,
+                       return_plot = TRUE,
+                       return_data = FALSE,
+                       output_path = NULL,
+                       stackable = FALSE))
     }
   })
   
@@ -337,9 +407,7 @@ server = function(input, output, session){
   # Print the data table
   output$dataTable <- renderDataTable({
     
-    validate(
-      need(input$queryICES, "Please click the ICES logo to download data"),
-      need(input$dataType, "Please select how you want the data")
+    validate(need(input$dataType, "Please select how you want the data")
     )
     
     if(req(input$dataType) == "stoGldEco") {
@@ -347,17 +415,17 @@ server = function(input, output, session){
       validate(    
         need(input$ecoregion_stoGldEco, "Please select ecoregion"),
         need(input$guild_stoGldEco, "Please select guild"),
-        need(input$stock.code_stoGldEco, "Please select stock")
+        need(input$stock_stoGldEco, "Please select stock")
       )
       
-      dat <- stockTrends() %>%
+      dat <- stockTrends()%>%
         filter(ECOREGION %in% input$ecoregion_stoGldEco,
-               FISHERIES.GUILD %in% input$guild_stoGldEco,
-               STOCK.CODE %in% input$stock.code_stoGldEco,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+               GUILD %in% input$guild_stoGldEco,
+               lineGroup %in% input$stock_stoGldEco,
+               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
       
       validate(
-        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+        need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
       )
       return(dat)
     }
@@ -369,16 +437,13 @@ server = function(input, output, session){
         need(input$guild_gldEco, "Please select guild")
       )
       
-      dat <- stockTrends() %>%
+      dat <- stockTrends()%>%
         filter(ECOREGION %in% input$ecoregion_gldEco,
-               FISHERIES.GUILD %in% input$guild_gldEco,
-               METRIC %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
-        select(-STOCK.CODE) %>%
-        group_by(Year, FISHERIES.GUILD, METRIC) %>%
-        summarize(stockValue = mean(stockValue, na.rm = TRUE))
+               GUILD %in% input$guild_gldEco,
+               plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
       
       validate(
-        need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+        need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
       )
       return(dat)
     }
@@ -389,9 +454,7 @@ server = function(input, output, session){
     filename = function() {paste0(input$textData, ".csv")},
     content = function(file) {
    
-      validate(
-        need(input$queryICES, "Please click the ICES logo to download data"),
-        need(input$dataType, "Please select how you want the data")
+      validate(need(input$dataType, "Please select how you want the data")
       )
       
       if(req(input$dataType) == "stoGldEco") {
@@ -399,17 +462,17 @@ server = function(input, output, session){
         validate(    
           need(input$ecoregion_stoGldEco, "Please select ecoregion"),
           need(input$guild_stoGldEco, "Please select guild"),
-          need(input$stock.code_stoGldEco, "Please select stock")
+          need(input$stock_stoGldEco, "Please select stock")
         )
         
-        dat <- stockTrends() %>%
+        dat <- stockTrends()%>%
           filter(ECOREGION %in% input$ecoregion_stoGldEco,
-                 FISHERIES.GUILD %in% input$guild_stoGldEco,
-                 STOCK.CODE %in% input$stock.code_stoGldEco,
-                 METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+                 GUILD %in% input$guild_stoGldEco,
+                 lineGroup %in% input$stock_stoGldEco,
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
         
         validate(
-          need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+          need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
         )
         
         write.csv(x = dat, file = file, row.names = FALSE)
@@ -422,16 +485,13 @@ server = function(input, output, session){
           need(input$guild_gldEco, "Please select guild")
         )
         
-        dat <- stockTrends() %>%
+        dat <- stockTrends()%>%
           filter(ECOREGION %in% input$ecoregion_gldEco,
-                 FISHERIES.GUILD %in% input$guild_gldEco,
-                 METRIC %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
-          select(-STOCK.CODE) %>%
-          group_by(Year, FISHERIES.GUILD, METRIC) %>%
-          summarize(stockValue = mean(stockValue, na.rm = TRUE))
+                 GUILD %in% input$guild_gldEco,
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger"))
         
         validate(
-          need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+          need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
         )
         
         write.csv(x = dat, file = file, row.names = FALSE)
@@ -443,9 +503,7 @@ server = function(input, output, session){
     filename = function() {paste0(input$textPlot, ".png")},
     content = function(file) {
       
-      validate(
-        need(input$queryICES, "Please click the ICES logo to download data"),
-        need(input$dataType, "Please select how you want the data")
+      validate(need(input$dataType, "Please select how you want the data")
       )
       
       if(req(input$dataType) == "stoGldEco") {
@@ -453,27 +511,40 @@ server = function(input, output, session){
         validate(    
           need(input$ecoregion_stoGldEco, "Please select ecoregion"),
           need(input$guild_stoGldEco, "Please select guild"),
-          need(input$stock.code_stoGldEco, "Please select stock")
+          need(input$stock_stoGldEco, "Please select stock")
         )
         
-        dat <- stockTrends() %>%
+        dat <- stockTrends()%>%
           filter(ECOREGION %in% input$ecoregion_stoGldEco,
-                 FISHERIES.GUILD %in% input$guild_stoGldEco,
-                 STOCK.CODE %in% input$stock.code_stoGldEco,
-                 METRIC %in% c("F_FMSY", "SSB_MSYBtrigger"))
+                 GUILD %in% input$guild_stoGldEco,
+                 lineGroup %in% input$stock_stoGldEco,
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>% 
+          mutate(pageGroup = sprintf("%s - %s stocks", 
+                                     ECOREGION, 
+                                     GUILD)) %>% 
+          select(-ECOREGION,
+                 -GUILD)
         
         validate(
-          need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+          need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
         )
         
-        png(file,
-            width = 89,
-            height = 50.25 * 2,
-            units = "mm",
-            res = 300)
+        object <- unique(dat$pageGroup)
         
-        stockSummaryTrends(dat = dat, LINEGROUP = "STOCK.CODE", overallMean = TRUE, legend.cex = 0.5)
-        dev.off()
+        stock_trends_fun(object = object,
+                         dat = dat,
+                         plotting_var = "StockCode",
+                         grouping_var = "EcoGuild",
+                         metric = "MSY",
+                         active_year = 2017,
+                         dynamic = FALSE,
+                         data_caption = TRUE,
+                         file_name = file,
+                         save_plot = TRUE,
+                         return_plot = FALSE,
+                         return_data = FALSE,
+                         output_path = NULL,
+                         stackable = FALSE)
         
       }
       
@@ -484,26 +555,45 @@ server = function(input, output, session){
           need(input$guild_gldEco, "Please select guild")
         )
         
-        dat <- stockTrends() %>%
+        dat <- stockTrends()%>%
           filter(ECOREGION %in% input$ecoregion_gldEco,
-                 FISHERIES.GUILD %in% input$guild_gldEco,
-                 METRIC %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
-          select(-STOCK.CODE) %>%
-          group_by(Year, FISHERIES.GUILD, METRIC) %>%
-          summarize(stockValue = mean(stockValue, na.rm = TRUE))
+                 GUILD %in% input$guild_gldEco,
+                 plotGroup %in% c("F_FMSY", "SSB_MSYBtrigger")) %>%
+          rename(pageGroup = ECOREGION,
+                 lineGroup = GUILD)
+          # select(-STOCK.CODE) %>%
+          # group_by(Year, FISHERIES.GUILD, METRIC) %>%
+          # summarize(stockValue = mean(stockValue, na.rm = TRUE))
         
         validate(
-          need(any(!is.na(dat$stockValue)), "This stock does not have necessary data")
+          need(any(!is.na(dat$plotValue)), "This stock does not have necessary data")
         )  
         
-        png(file,
-            width = 89,
-            height = 50.25 * 2,
-            units = "mm",
-            res = 300)
+        object <- unique(dat$pageGroup)
         
-        stockSummaryTrends(dat = dat, LINEGROUP = "FISHERIES.GUILD", overallMean = TRUE, legend.cex = 0.5)
-        dev.off()
+        stock_trends_fun(object = output,
+                         dat = dat,
+                         plotting_var = "FisheriesGuild",
+                         grouping_var = "EcoRegion",
+                         metric = "MSY",
+                         active_year = 2017,
+                         dynamic = FALSE,
+                         data_caption = TRUE,
+                         file_name = file,
+                         save_plot = TRUE,
+                         return_plot = FALSE,
+                         return_data = FALSE,
+                         output_path = NULL,
+                         stackable = FALSE)
+        
+        # png(file,
+        #     width = 89,
+        #     height = 50.25 * 2,
+        #     units = "mm",
+        #     res = 300)
+        # 
+        # stockSummaryTrends(dat = dat, LINEGROUP = "FISHERIES.GUILD", overallMean = TRUE, legend.cex = 0.5)
+        # dev.off()
       }
     }
   )} 
